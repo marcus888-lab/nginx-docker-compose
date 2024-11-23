@@ -1,84 +1,195 @@
-# Nginx Docker Compose Setup with SSL
+# Nginx Reverse Proxy with SSL Setup
 
-This repository contains a Docker Compose configuration for running Nginx with automatic SSL certificate management using Certbot.
-
-## Features
-
-- Nginx web server with SSL support
-- Automatic SSL certificate management with Certbot
-- Docker Compose setup for easy deployment
-- Support for multiple domains and services
-
-## Prerequisites
-
-- Docker
-- Docker Compose
-- Domain name pointed to your server
+This repository contains a Docker-based Nginx reverse proxy setup with SSL/TLS support using Let's Encrypt certificates.
 
 ## Directory Structure
 
 ```
-.
-├── docker-compose.yml    # Docker compose configuration
-├── nginx.conf           # Nginx server configuration
-├── html/               # Static website files
-├── certbot/            # SSL certificates and challenges
-    ├── conf/          # Certificate storage
-    └── www/           # ACME challenge files
+nginx-docker-compose/
+├── sites-available/          # Nginx site configurations
+│   ├── default.conf
+│   ├── marcus888.com.conf
+│   └── autoresearch.marcus888.com.conf
+├── sites-enabled/           # Symlinks to enabled configurations
+├── html/                    # Static website content
+│   ├── index.html          # Main site content
+│   └── autoresearch/       # Autoresearch subdomain content
+├── certbot/                # SSL certificates and challenges
+│   ├── conf/               # Let's Encrypt configuration and certificates
+│   └── www/               # ACME challenge files
+├── nginx.conf              # Main Nginx configuration
+└── docker-compose.yml      # Docker services configuration
 ```
 
-## Setup Instructions
+## Features
 
-1. Clone this repository:
+- Secure SSL/TLS configuration with Let's Encrypt certificates
+- Separate SSL certificates for each domain and subdomain
+- Automatic HTTP to HTTPS redirection
+- Modern SSL configuration with TLS 1.2 and 1.3 support
+- Security headers including HSTS
+- Gzip compression for better performance
+- Automatic certificate renewal
 
-   ```bash
-   git clone https://github.com/marcus888-lab/nginx-docker-compose.git
-   cd nginx-docker-compose
-   ```
+## Initial Setup
 
-2. Configure your domain in `nginx.conf`
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd nginx-docker-compose
+```
+
+2. Create required directories:
+
+```bash
+mkdir -p certbot/conf certbot/www
+mkdir -p html/autoresearch
+```
 
 3. Start the services:
 
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+docker-compose up -d
+```
 
-4. SSL certificates will be automatically obtained and renewed by Certbot
+## SSL Certificate Setup
 
-## Configuration
+1. Request certificates for main domain:
 
-### Docker Compose
+```bash
+docker-compose exec certbot certbot certonly --webroot \
+  -w /var/www/certbot \
+  -d marcus888.com \
+  -d www.marcus888.com \
+  --email admin@marcus888.com \
+  --agree-tos \
+  --no-eff-email
+```
 
-The `docker-compose.yml` file defines two services:
+2. Request certificate for subdomain:
 
-- `nginx`: Web server with SSL support
-- `certbot`: Automatic SSL certificate management
+```bash
+docker-compose exec certbot certbot certonly --webroot \
+  -w /var/www/certbot \
+  -d autoresearch.marcus888.com \
+  --email admin@marcus888.com \
+  --agree-tos \
+  --no-eff-email
+```
 
-### Nginx Configuration
+## Configuration Details
 
-The `nginx.conf` file contains the server configuration including:
+### SSL Configuration
 
-- SSL settings
-- Domain configurations
-- Proxy settings for other services
+Each domain has its own SSL configuration with:
 
-## SSL Certificates
+- Separate certificates
+- Dedicated SSL session cache
+- Modern cipher suites
+- OCSP stapling
+- Strict security headers
 
-SSL certificates are automatically managed by Certbot:
+Example SSL configuration:
 
-- Initial certificate acquisition
-- Automatic renewal every 12 hours
-- Storage in `certbot/conf/`
+```nginx
+ssl_certificate /etc/letsencrypt/live/domain/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/domain/privkey.pem;
+ssl_trusted_certificate /etc/letsencrypt/live/domain/chain.pem;
+ssl_session_cache shared:SSL_domain:10m;
+ssl_session_timeout 1d;
+ssl_protocols TLSv1.2 TLSv1.3;
+```
 
-## Adding New Services
+### Security Headers
 
-To add a new service:
+All sites include security headers:
 
-1. Uncomment and modify the example service in `docker-compose.yml`
-2. Add the corresponding network configuration
-3. Update the Nginx configuration to proxy to the new service
+```nginx
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "no-referrer-when-downgrade" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+```
+
+## Maintenance
+
+### Certificate Renewal
+
+Certificates are automatically renewed by Certbot container. Manual renewal if needed:
+
+```bash
+docker-compose exec certbot certbot renew
+```
+
+### Adding New Sites
+
+1. Create site configuration in `sites-available/`:
+
+```bash
+nano sites-available/newsite.conf
+```
+
+2. Create symbolic link in `sites-enabled/`:
+
+```bash
+ln -s ../sites-available/newsite.conf sites-enabled/
+```
+
+3. Request SSL certificate:
+
+```bash
+docker-compose exec certbot certbot certonly --webroot \
+  -w /var/www/certbot \
+  -d newsite.com \
+  --email admin@marcus888.com \
+  --agree-tos
+```
+
+4. Reload Nginx:
+
+```bash
+docker-compose restart nginx
+```
+
+### Troubleshooting
+
+1. Check Nginx configuration:
+
+```bash
+docker-compose exec nginx nginx -t
+```
+
+2. View Nginx logs:
+
+```bash
+docker-compose logs nginx
+```
+
+3. Check SSL certificates:
+
+```bash
+docker-compose exec certbot certbot certificates
+```
+
+## Security Best Practices
+
+1. Keep certificates and private keys secure
+2. Regularly update Docker images
+3. Monitor certificate expiration
+4. Use strong SSL configuration
+5. Enable security headers
+6. Regular security audits
+
+## Backup
+
+Backup these directories regularly:
+
+- `certbot/conf/` - SSL certificates and configuration
+- `sites-available/` - Nginx configurations
+- `html/` - Website content
 
 ## License
 
-MIT License
+[Your License Here]
