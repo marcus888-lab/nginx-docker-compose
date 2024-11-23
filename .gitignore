@@ -1,0 +1,7 @@
+# Ignore certbot files
+certbot/conf/
+certbot/www/
+
+# Keep certbot directories but ignore contents
+!certbot/conf/.gitkeep
+!certbot/www/.gitkeep
